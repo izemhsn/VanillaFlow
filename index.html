@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VanillaFlow</title>
+    <script src="VanillaFlow.js" defer></script>
+</head>
+<body>
+    <div x-if="isVisible">
+        <p>This should be visible</p>
+    </div>
+    <div x-show="isHidden">
+        <p>This should be hidden</p>
+    </div>
+
+    <script>
+        let isVisible = true;
+        let isHidden = true;
+    </script>
+</body>
+</html>
