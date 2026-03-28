@@ -1,33 +1,37 @@
-window.addEventListener('load', init);
+export default class VanillaFlow {
+    init() {
+        this.directives = {
+            'x-if': this.processIf.bind(this),
+            'x-show': this.processShow.bind(this),
+        };
+        
+        for (const [attr, handler] of Object.entries(this.directives)) {
+            document.querySelectorAll(`[${attr}]`).forEach(el => {
+                handler(el, el.getAttribute(attr));
+            });
+        }
+        return this;
+    }
 
-function init() {
-    processDirective('x-if', (el, condition) => {
-        el.style.display = condition ? '' : 'none';
-    });
+    processIf(el, condition) {
+        if (!this.evaluate(condition)) {
+            el.remove();
+        }
+    }
 
-    processDirective('x-show', (el, condition) => {
-        el.style.visibility = condition ? 'visible' : 'hidden';
-    });
-}
+    processShow(el, condition) {
+        el.style.display = this.evaluate(condition) ? '' : 'none';
+    }
 
-function processDirective(attr, apply) {
-    document.querySelectorAll(`[${attr}]`).forEach(el => {
-        const expression = el.getAttribute(attr);
-        apply(el, evaluateExpression(expression));
-    });
-}
-
-function evaluateExpression(expression) {
-    expression = expression.trim();
-    
-    if (expression === 'true') return true;
-    if (expression === 'false') return false;
-    
-    try {
-        return new Function(`return ${expression};`)();
-    } catch {
-        return false;
+    evaluate(expression) {
+        try {
+            return new Function(`return ${expression};`)();
+        } catch {
+            return undefined;
+        }
     }
 }
 
-
+if (typeof window !== 'undefined') {
+    window.VanillaFlow = VanillaFlow;
+}
