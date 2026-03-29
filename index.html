@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VanillaFlow</title>
-    <script src="VanillaFlow.js" defer></script>
 </head>
 <body>
     <div x-if="isVisible">
@@ -13,10 +12,20 @@
     <div x-show="isHidden">
         <p>This should be hidden</p>
     </div>
+    <div x-text="message"></div>
+    <div x-html="htmlContent"></div>
 
-    <script>
-        let isVisible = true;
-        let isHidden = true;
+    <script type="module">
+        import VanillaFlow from './VanillaFlow.js';
+        
+        const data = {
+            isVisible: true,
+            isHidden: true,
+            message: 'Replaced text',
+            htmlContent: '<strong>Bold HTML</strong>'
+        };
+        
+        new VanillaFlow(data).init();
     </script>
 </body>
 </html>
