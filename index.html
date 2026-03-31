@@ -4,16 +4,48 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VanillaFlow</title>
+    <style>
+        section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        h3 { margin: 0 0 10px 0; font-size: 14px; color: #666; }
+        .active { color: green; }
+        .highlight { background-color: yellow; }
+        button { padding: 8px 16px; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+    </style>
 </head>
 <body>
-    <div x-if="isVisible">
-        <p>This should be visible</p>
-    </div>
-    <div x-show="isHidden">
-        <p>This should be hidden</p>
-    </div>
-    <div x-text="message"></div>
-    <div x-html="htmlContent"></div>
+    <section>
+        <h3>x-if</h3>
+        <div x-if="isVisible">This is visible</div>
+    </section>
+
+    <section>
+        <h3>x-show</h3>
+        <div x-show="isHidden">This is shown</div>
+    </section>
+
+    <section>
+        <h3>x-text</h3>
+        <div x-text="message"></div>
+    </section>
+
+    <section>
+        <h3>x-html</h3>
+        <div x-html="htmlContent"></div>
+    </section>
+
+    <section>
+        <h3>x-bind:class</h3>
+        <div x-bind:class="isGreen ? 'active' : 'highlight'">
+            Dynamic class (isGreen=true → green text)
+        </div>
+
+        <hr>
+
+        <h3>x-bind:disabled</h3>
+        <button x-bind:disabled="isDisabled">Disabled Button</button>
+        <span> (isDisabled=true)</span>
+    </section>
 
     <script type="module">
         import VanillaFlow from './VanillaFlow.js';
@@ -22,7 +54,9 @@
             isVisible: true,
             isHidden: true,
             message: 'Replaced text',
-            htmlContent: '<strong>Bold HTML</strong>'
+            htmlContent: '<strong>Bold HTML</strong>',
+            isGreen: true,
+            isDisabled: true
         };
         
         new VanillaFlow(data).init();
