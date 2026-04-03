@@ -1,6 +1,12 @@
 export default class VanillaFlow {
     constructor(data = {}) {
         this.data = data;
+        
+        Object.keys(data).forEach(key => {
+            if (typeof data[key] === 'function') {
+                data[key] = data[key].bind(data);
+            }
+        });
     }
 
     init() {
@@ -31,6 +37,10 @@ export default class VanillaFlow {
                     el.setAttribute(attrName, value);
                 }
             }
+            
+            if (Array.from(el.attributes).some(a => a.name.startsWith('x-on:'))) {
+                this.processOn(el);
+            }
         });
         return this;
     }
@@ -55,6 +65,28 @@ export default class VanillaFlow {
 
     processBind(el, expression) {
         el.value = this.evaluate(expression);
+    }
+
+    processOn(el) {
+        for (const a of Array.from(el.attributes)) {
+            if (a.name.startsWith('x-on:')) {
+                const eventConfig = a.name.slice(5);
+                const [event, ...modifiers] = eventConfig.split('.');
+                const handler = a.value;
+                el.removeAttribute(a.name);
+                
+                el.addEventListener(event, (e) => {
+                    for (const mod of modifiers) {
+                        if (mod === 'prevent') e.preventDefault();
+                        if (mod === 'stop') e.stopPropagation();
+                    }
+                    this.evaluate(handler);
+                    document.querySelectorAll('[x-text]').forEach(el => {
+                        el.textContent = this.evaluate(el.getAttribute('x-text'));
+                    });
+                });
+            }
+        }
     }
 
     evaluate(expression) {

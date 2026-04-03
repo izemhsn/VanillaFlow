@@ -34,7 +34,7 @@
         <div x-html="htmlContent"></div>
     </section>
 
-    <section>
+<section>
         <h3>x-bind:class</h3>
         <div x-bind:class="isGreen ? 'active' : 'highlight'">
             Dynamic class (isGreen=true → green text)
@@ -47,6 +47,20 @@
         <span> (isDisabled=true)</span>
     </section>
 
+    <section>
+        <h3>x-on:click</h3>
+        <p>Count: <span x-text="count"></span></p>
+        <button x-on:click="increment()">Increment</button>
+        <button x-on:click="count = 0">Reset</button>
+        
+        <hr>
+        
+        <h3>x-on:click.prevent</h3>
+        <a href="https://example.com" x-on:click.prevent="alertLink()">
+            Click me (link prevented)
+        </a>
+    </section>
+
     <script type="module">
         import VanillaFlow from './VanillaFlow.js';
         
@@ -56,7 +70,14 @@
             message: 'Replaced text',
             htmlContent: '<strong>Bold HTML</strong>',
             isGreen: true,
-            isDisabled: true
+            isDisabled: true,
+            count: 0,
+            increment() {
+                this.count++;
+            },
+            alertLink() {
+                alert('Link clicked but prevented!');
+            }
         };
         
         new VanillaFlow(data).init();
