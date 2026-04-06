@@ -11,11 +11,13 @@ export default class VanillaFlow {
 
     init() {
         this.directives = {
-            'x-if': this.processIf.bind(this),
-            'x-show': this.processShow.bind(this),
+            'x-model': this.processModel.bind(this),
             'x-text': this.processText.bind(this),
             'x-html': this.processHtml.bind(this),
+            'x-show': this.processShow.bind(this),
+            'x-if': this.processIf.bind(this),
             'x-bind': this.processBind.bind(this),
+            'x-for': this.processFor.bind(this),
         };
         
         for (const [attr, handler] of Object.entries(this.directives)) {
@@ -25,34 +27,21 @@ export default class VanillaFlow {
         }
         
         document.querySelectorAll('*').forEach(el => {
-            const attrs = Array.from(el.attributes).filter(a => a.name.startsWith('x-bind:'));
-            for (const attr of attrs) {
-                const attrName = attr.name.slice(7);
-                const value = this.evaluate(attr.value);
-                el.removeAttribute(attr.name);
-                if (value === true) {
-                    el.setAttribute(attrName, '');
-                } else if (value === false || value === null || value === undefined) {
-                } else {
-                    el.setAttribute(attrName, value);
-                }
-            }
-            
-            if (Array.from(el.attributes).some(a => a.name.startsWith('x-on:'))) {
-                this.processOn(el);
-            }
+            this.processBindAttrs(el);
+            this.processOnAttrs(el);
         });
         return this;
     }
 
-    processIf(el, expression) {
-        if (!this.evaluate(expression)) {
-            el.remove();
-        }
-    }
-
-    processShow(el, expression) {
-        el.style.display = this.evaluate(expression) ? '' : 'none';
+    processModel(el, expression) {
+        el.value = this.evaluate(expression);
+        
+        el.addEventListener('input', () => {
+            this.data[expression] = el.value;
+            document.querySelectorAll('[x-text]').forEach(el => {
+                el.textContent = this.evaluate(el.getAttribute('x-text'));
+            });
+        });
     }
 
     processText(el, expression) {
@@ -63,11 +52,37 @@ export default class VanillaFlow {
         el.innerHTML = this.evaluate(expression);
     }
 
+    processShow(el, expression) {
+        el.style.display = this.evaluate(expression) ? '' : 'none';
+    }
+
+    processIf(el, expression) {
+        if (!this.evaluate(expression)) {
+            el.remove();
+        }
+    }
+
     processBind(el, expression) {
         el.value = this.evaluate(expression);
     }
 
-    processOn(el) {
+    processBindAttrs(el) {
+        const attrs = Array.from(el.attributes).filter(a => a.name.startsWith('x-bind:'));
+        for (const attr of attrs) {
+            const attrName = attr.name.slice(7);
+            const value = this.evaluate(attr.value);
+            el.removeAttribute(attr.name);
+            if (value === true) {
+                el.setAttribute(attrName, '');
+            } else if (value === false || value === null || value === undefined) {
+                el.removeAttribute(attrName);
+            } else {
+                el.setAttribute(attrName, value);
+            }
+        }
+    }
+
+    processOnAttrs(el) {
         for (const a of Array.from(el.attributes)) {
             if (a.name.startsWith('x-on:')) {
                 const eventConfig = a.name.slice(5);
@@ -87,6 +102,51 @@ export default class VanillaFlow {
                 });
             }
         }
+    }
+
+    processFor(el, expression) {
+        const match = expression.match(/^(?:\(([^)]+)\)|(\S+))\s+in\s+(.+)$/);
+        if (!match) return;
+        
+        const [, destructured, simpleVar, arrayExpr] = match;
+        const array = this.evaluate(arrayExpr);
+        
+        if (!Array.isArray(array)) return;
+        
+        const fragment = document.createDocumentFragment();
+        const parent = el.parentNode;
+        const savedData = this.data;
+        
+        array.forEach((item, index) => {
+            const clone = el.cloneNode(true);
+            clone.removeAttribute('x-for');
+            
+            this.data = { ...savedData };
+            if (destructured) {
+                const parts = destructured.split(',').map(p => p.trim());
+                this.data[parts[0]] = item;
+                if (parts[1]) this.data[parts[1]] = index;
+            } else {
+                this.data[simpleVar] = item;
+            }
+            
+            const els = [clone, ...clone.querySelectorAll('*')];
+            for (const child of els) {
+                for (const [attr, handler] of Object.entries(this.directives)) {
+                    if (attr !== 'x-for' && child.hasAttribute(attr)) {
+                        handler(child, child.getAttribute(attr));
+                        child.removeAttribute(attr);
+                    }
+                }
+                this.processBindAttrs(child);
+                this.processOnAttrs(child);
+            }
+            
+            fragment.appendChild(clone);
+        });
+        
+        this.data = savedData;
+        parent.replaceChild(fragment, el);
     }
 
     evaluate(expression) {
