@@ -1,27 +1,47 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VanillaFlow</title>
     <style>
-        section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
-        h3 { margin: 0 0 10px 0; font-size: 14px; color: #666; }
-        .active { color: green; }
-        .highlight { background-color: yellow; }
-        button { padding: 8px 16px; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+        }
+
+        h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .active {
+            color: green;
+        }
+
+        .highlight {
+            background-color: yellow;
+        }
+
+        button {
+            padding: 8px 16px;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
     </style>
 </head>
+
 <body>
     <section>
-        <h3>x-if</h3>
-        <div x-if="isVisible">This is visible</div>
-    </section>
-
-    <section>
-        <h3>x-show</h3>
-        <div x-show="isHidden">This is shown</div>
+        <h3>x-model</h3>
+        <input x-model="inputValue" placeholder="Type something...">
+        <p>You typed: <span x-text="inputValue"></span></p>
     </section>
 
     <section>
@@ -34,7 +54,17 @@
         <div x-html="htmlContent"></div>
     </section>
 
-<section>
+    <section>
+        <h3>x-show</h3>
+        <div x-show="isHidden">This is shown</div>
+    </section>
+
+    <section>
+        <h3>x-if</h3>
+        <div x-if="isVisible">This is visible</div>
+    </section>
+
+    <section>
         <h3>x-bind:class</h3>
         <div x-bind:class="isGreen ? 'active' : 'highlight'">
             Dynamic class (isGreen=true → green text)
@@ -52,19 +82,38 @@
         <p>Count: <span x-text="count"></span></p>
         <button x-on:click="increment()">Increment</button>
         <button x-on:click="count = 0">Reset</button>
-        
+
         <hr>
-        
+
         <h3>x-on:click.prevent</h3>
         <a href="https://example.com" x-on:click.prevent="alertLink()">
             Click me (link prevented)
         </a>
     </section>
 
+    <section>
+        <h3>x-for</h3>
+        <ul>
+            <li x-for="item in items">
+                <span x-text="item"></span>
+            </li>
+        </ul>
+
+        <hr>
+
+        <h3>x-for with index</h3>
+        <ol>
+            <li x-for="(item, index) in items">
+                <span x-text="index + 1 + '. ' + item"></span>
+            </li>
+        </ol>
+    </section>
+
     <script type="module">
         import VanillaFlow from './VanillaFlow.js';
-        
+
         const data = {
+            items: ['Apple', 'Banana', 'Cherry'],
             isVisible: true,
             isHidden: true,
             message: 'Replaced text',
@@ -72,6 +121,7 @@
             isGreen: true,
             isDisabled: true,
             count: 0,
+            inputValue: '',
             increment() {
                 this.count++;
             },
@@ -79,8 +129,9 @@
                 alert('Link clicked but prevented!');
             }
         };
-        
+
         new VanillaFlow(data).init();
     </script>
 </body>
+
 </html>
