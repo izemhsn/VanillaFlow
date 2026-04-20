@@ -1,164 +1,171 @@
 export default class VanillaFlow {
     constructor(data = {}) {
         this.data = data;
-        
-        Object.keys(data).forEach(key => {
+        this.bindings = [];
+        this._cache = new Map();
+
+        for (const key of Object.keys(data)) {
             if (typeof data[key] === 'function') {
                 data[key] = data[key].bind(data);
             }
-        });
+        }
     }
 
-    init() {
-        this.directives = {
-            'x-model': this.processModel.bind(this),
-            'x-text': this.processText.bind(this),
-            'x-html': this.processHtml.bind(this),
-            'x-show': this.processShow.bind(this),
-            'x-if': this.processIf.bind(this),
-            'x-bind': this.processBind.bind(this),
-            'x-for': this.processFor.bind(this),
-        };
-        
-        for (const [attr, handler] of Object.entries(this.directives)) {
-            document.querySelectorAll(`[${attr}]`).forEach(el => {
-                handler(el, el.getAttribute(attr));
-            });
-        }
-        
-        document.querySelectorAll('*').forEach(el => {
-            this.processBindAttrs(el);
-            this.processOnAttrs(el);
-        });
+    init(root) {
+        this.root = root || document.body;
+        if (!this.root) return this;
+        this.processNode(this.root, undefined);
         return this;
     }
 
-    processModel(el, expression) {
-        el.value = this.evaluate(expression);
-        
-        el.addEventListener('input', () => {
-            this.data[expression] = el.value;
-            document.querySelectorAll('[x-text]').forEach(el => {
-                el.textContent = this.evaluate(el.getAttribute('x-text'));
-            });
+    processNode(el, scope) {
+        if (el.hasAttribute('x-for')) {
+            this.processFor(el, el.getAttribute('x-for'), scope);
+            return false;
+        }
+        if (el.hasAttribute('x-if')) {
+            const keep = this.evaluate(el.getAttribute('x-if'), scope);
+            el.removeAttribute('x-if');
+            if (!keep) {
+                el.remove();
+                return false;
+            }
+        }
+        if (el.hasAttribute('x-model')) {
+            this.processModel(el, el.getAttribute('x-model'), scope);
+            el.removeAttribute('x-model');
+        }
+        if (el.hasAttribute('x-text')) {
+            const expr = el.getAttribute('x-text');
+            el.textContent = this.evaluate(expr, scope) ?? '';
+            this.bindings.push({ type: 'text', el, expr, scope });
+            el.removeAttribute('x-text');
+        }
+        if (el.hasAttribute('x-html')) {
+            const expr = el.getAttribute('x-html');
+            el.innerHTML = this.evaluate(expr, scope) ?? '';
+            this.bindings.push({ type: 'html', el, expr, scope });
+            el.removeAttribute('x-html');
+        }
+        if (el.hasAttribute('x-show')) {
+            const expr = el.getAttribute('x-show');
+            el.style.display = this.evaluate(expr, scope) ? '' : 'none';
+            this.bindings.push({ type: 'show', el, expr, scope });
+            el.removeAttribute('x-show');
+        }
+        this.processBindAttrs(el, scope);
+        this.processOnAttrs(el, scope);
+
+        for (const child of Array.from(el.children)) {
+            this.processNode(child, scope);
+        }
+        return true;
+    }
+
+    processModel(el, expression, scope) {
+        const isCheckbox = el.type === 'checkbox';
+        const current = this.evaluate(expression, scope);
+        if (isCheckbox) el.checked = !!current;
+        else el.value = current ?? '';
+
+        el.addEventListener(isCheckbox ? 'change' : 'input', () => {
+            const val = isCheckbox ? el.checked : el.value;
+            this.evaluate(`${expression} = __vfval`, { ...(scope || {}), __vfval: val });
+            this.refresh();
         });
     }
 
-    processText(el, expression) {
-        el.textContent = this.evaluate(expression);
-    }
-
-    processHtml(el, expression) {
-        el.innerHTML = this.evaluate(expression);
-    }
-
-    processShow(el, expression) {
-        el.style.display = this.evaluate(expression) ? '' : 'none';
-    }
-
-    processIf(el, expression) {
-        if (!this.evaluate(expression)) {
-            el.remove();
-        }
-    }
-
-    processBind(el, expression) {
-        el.value = this.evaluate(expression);
-    }
-
-    processBindAttrs(el) {
+    processBindAttrs(el, scope) {
         const attrs = Array.from(el.attributes).filter(a => a.name.startsWith('x-bind:'));
         for (const attr of attrs) {
             const attrName = attr.name.slice(7);
-            const value = this.evaluate(attr.value);
+            const expr = attr.value;
             el.removeAttribute(attr.name);
-            if (value === true) {
-                el.setAttribute(attrName, '');
-            } else if (value === false || value === null || value === undefined) {
-                el.removeAttribute(attrName);
-            } else {
-                el.setAttribute(attrName, value);
-            }
+            this.applyAttr(el, attrName, this.evaluate(expr, scope));
+            this.bindings.push({ type: 'attr', el, expr, scope, attr: attrName });
         }
     }
 
-    processOnAttrs(el) {
+    applyAttr(el, name, value) {
+        if (value === true) el.setAttribute(name, '');
+        else if (value === false || value == null) el.removeAttribute(name);
+        else el.setAttribute(name, value);
+    }
+
+    processOnAttrs(el, scope) {
         for (const a of Array.from(el.attributes)) {
-            if (a.name.startsWith('x-on:')) {
-                const eventConfig = a.name.slice(5);
-                const [event, ...modifiers] = eventConfig.split('.');
-                const handler = a.value;
-                el.removeAttribute(a.name);
-                
-                el.addEventListener(event, (e) => {
-                    for (const mod of modifiers) {
-                        if (mod === 'prevent') e.preventDefault();
-                        if (mod === 'stop') e.stopPropagation();
-                    }
-                    this.evaluate(handler);
-                    document.querySelectorAll('[x-text]').forEach(el => {
-                        el.textContent = this.evaluate(el.getAttribute('x-text'));
-                    });
-                });
-            }
+            if (!a.name.startsWith('x-on:')) continue;
+            const [event, ...modifiers] = a.name.slice(5).split('.');
+            const handler = a.value;
+            el.removeAttribute(a.name);
+            el.addEventListener(event, ($event) => {
+                for (const mod of modifiers) {
+                    if (mod === 'prevent') $event.preventDefault();
+                    if (mod === 'stop') $event.stopPropagation();
+                }
+                this.evaluate(handler, { ...(scope || {}), $event });
+                this.refresh();
+            });
         }
     }
 
-    processFor(el, expression) {
+    processFor(el, expression, parentScope) {
         const match = expression.match(/^(?:\(([^)]+)\)|(\S+))\s+in\s+(.+)$/);
         if (!match) return;
-        
+
         const [, destructured, simpleVar, arrayExpr] = match;
-        const array = this.evaluate(arrayExpr);
-        
+        const array = this.evaluate(arrayExpr, parentScope);
         if (!Array.isArray(array)) return;
-        
-        const fragment = document.createDocumentFragment();
+
         const parent = el.parentNode;
-        const savedData = this.data;
-        
+        if (!parent) return;
+
+        const fragment = document.createDocumentFragment();
+
         array.forEach((item, index) => {
             const clone = el.cloneNode(true);
             clone.removeAttribute('x-for');
-            
-            this.data = { ...savedData };
+
+            const scope = { ...parentScope };
             if (destructured) {
                 const parts = destructured.split(',').map(p => p.trim());
-                this.data[parts[0]] = item;
-                if (parts[1]) this.data[parts[1]] = index;
+                scope[parts[0]] = item;
+                if (parts[1]) scope[parts[1]] = index;
             } else {
-                this.data[simpleVar] = item;
+                scope[simpleVar] = item;
             }
-            
-            const els = [clone, ...clone.querySelectorAll('*')];
-            for (const child of els) {
-                for (const [attr, handler] of Object.entries(this.directives)) {
-                    if (attr !== 'x-for' && child.hasAttribute(attr)) {
-                        handler(child, child.getAttribute(attr));
-                        child.removeAttribute(attr);
-                    }
-                }
-                this.processBindAttrs(child);
-                this.processOnAttrs(child);
-            }
-            
-            fragment.appendChild(clone);
+
+            if (this.processNode(clone, scope)) fragment.appendChild(clone);
         });
-        
-        this.data = savedData;
+
         parent.replaceChild(fragment, el);
     }
 
-    evaluate(expression) {
+    refresh() {
+        this.bindings = this.bindings.filter(b => b.el.isConnected);
+        for (const b of this.bindings) {
+            const v = this.evaluate(b.expr, b.scope);
+            if (b.type === 'text') b.el.textContent = v ?? '';
+            else if (b.type === 'html') b.el.innerHTML = v ?? '';
+            else if (b.type === 'show') b.el.style.display = v ? '' : 'none';
+            else if (b.type === 'attr') this.applyAttr(b.el, b.attr, v);
+        }
+    }
+
+    evaluate(expression, scope) {
         try {
-            const func = new Function(...Object.keys(this.data), `return ${expression}`);
-            return func(...Object.values(this.data));
-        } catch {
-            let value = this.data;
-            for (const key of expression.split('.')) {
-                value = value?.[key];
+            let fn = this._cache.get(expression);
+            if (!fn) {
+                fn = new Function(
+                    '$data', '$scope',
+                    `with ($data) { with ($scope) { return (${expression}); } }`
+                );
+                this._cache.set(expression, fn);
             }
-            return value;
+            return fn(this.data, scope || {});
+        } catch (err) {
+            console.warn(`[VanillaFlow] Error evaluating "${expression}":`, err.message);
+            return undefined;
         }
     }
 }

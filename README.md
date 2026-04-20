@@ -1,6 +1,8 @@
 # VanillaFlow
 
-A lightweight (~170 LOC) vanilla JavaScript library for declarative DOM manipulation with reactive directives. Zero dependencies, no build step required.
+[![license](https://img.shields.io/github/license/izemhsn/VanillaFlow.svg)](./LICENSE)
+
+A tiny (~1.4 KB gzipped) vanilla JavaScript library for declarative DOM manipulation with reactive directives. Zero dependencies, no build step required.
 
 ## Features
 
@@ -8,7 +10,32 @@ A lightweight (~170 LOC) vanilla JavaScript library for declarative DOM manipula
 - **Zero dependencies** — pure vanilla JavaScript
 - **No build step** — drop it in and go
 - **ES module & global** — works with `import` or a `<script>` tag
-- **Tiny footprint** — single file, under 170 lines
+- **Tiny footprint** — single file, ~1.4 KB gzipped
+
+## Install
+
+Grab either file directly from this repo (or the assets of a GitHub release) — **no build step, no package manager required.**
+
+- [`VanillaFlow.js`](./VanillaFlow.js) — readable source (~6 KB)
+- [`VanillaFlow.min.js`](./VanillaFlow.min.js) — minified (~1.4 KB gzipped)
+
+Put it next to your HTML and import it as a module:
+
+```html
+<script type="module">
+  import VanillaFlow from './VanillaFlow.min.js';
+  new VanillaFlow({ message: 'Hello!' }).init();
+</script>
+```
+
+The library also exposes itself as `window.VanillaFlow` once loaded, so you can use it from classic scripts too:
+
+```html
+<script type="module" src="./VanillaFlow.min.js"></script>
+<script>
+  new VanillaFlow({ message: 'Hello!' }).init();
+</script>
+```
 
 ## Quick Start
 
@@ -150,14 +177,47 @@ All directive values are **JavaScript expressions** evaluated with the data obje
 
 ### `new VanillaFlow(data)`
 
-Creates a new instance. `data` is a plain object whose properties and methods become available in directive expressions.
+Creates a new instance. `data` is a plain object whose properties and methods become available in directive expressions. Methods are automatically bound so `this` inside them refers to `data`.
 
-### `.init()`
+### `.init(root?)`
 
-Processes all directives in the document and returns the instance.
+Processes all directives inside `root` and returns the instance. `root` defaults to `document.body`; pass an element to scope an instance to a subtree (two instances on the same page can coexist this way).
 
 ```js
 const app = new VanillaFlow({ message: 'Hi' }).init();
+// or scope to a specific element:
+new VanillaFlow(data).init(document.getElementById('app'));
+```
+
+### `.refresh()`
+
+Re-evaluates all `x-text`, `x-html`, `x-show`, and `x-bind:*` bindings. Called automatically after every `x-model` input, `change`, and `x-on:*` event. Call it manually if you mutate `data` outside of event handlers:
+
+```js
+setInterval(() => {
+  app.data.count++;
+  app.refresh();
+}, 1000);
+```
+
+## Caveats
+
+- **`x-for` list size is not reactive.** The list length is rendered once at `init()` time; mutating the array afterwards won't add or remove DOM nodes. Mutating **fields on existing items** (e.g. `items[0].name = 'Z'`) *is* reflected after the next `refresh()`.
+- **`x-if` is one-shot.** When the expression is falsy at `init()`, the element is removed from the DOM and is not brought back.
+- **`x-model` needs a property path.** Binding to a plain loop variable (`x-model="item"` inside `x-for="item in items"`) can't write back into the array. Use a property path instead: `x-model="item.value"`.
+- **`x-model` input types.** Text inputs and `type="checkbox"` are supported. Radio groups, `<select multiple>`, and numeric coercion (`type="number"`, `"range"`, `"date"`) are not — bound values stay as strings.
+- **`x-html` is an XSS sink.** Never pass untrusted strings to it.
+- **Reserved name.** `__vfval` is used internally by `x-model`; avoid it as a `data` key. `$event` is reserved inside `x-on:*` handlers only.
+- **Event modifiers supported:** `.prevent`, `.stop`. Others (`.once`, `.enter`, …) are not.
+- **CSP.** Expressions are compiled with `new Function`, so a Content Security Policy must allow `'unsafe-eval'`.
+- **One `init()` per instance.** Calling `init()` twice will re-attach listeners and double-process bindings; create a new instance instead.
+
+## Development
+
+```bash
+npm install        # install terser for the minified build
+npm run build      # produce VanillaFlow.min.js + source map
+npm run dev        # serve the repo locally for index.html
 ```
 
 ## Browser Support
@@ -166,4 +226,4 @@ Works in all modern browsers that support ES modules and `new Function()`.
 
 ## License
 
-MIT
+[MIT](./LICENSE) &copy; El Houssaine Izem

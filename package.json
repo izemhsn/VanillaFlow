@@ -1,0 +1,58 @@
+{
+  "name": "vanillaflow",
+  "version": "1.0.0",
+  "description": "A tiny (~1.4 KB gzipped) zero-dependency reactive directives library for vanilla JavaScript.",
+  "type": "module",
+  "main": "./VanillaFlow.js",
+  "module": "./VanillaFlow.js",
+  "exports": {
+    ".": {
+      "import": "./VanillaFlow.js",
+      "default": "./VanillaFlow.js"
+    },
+    "./min": {
+      "import": "./VanillaFlow.min.js",
+      "default": "./VanillaFlow.min.js"
+    }
+  },
+  "files": [
+    "VanillaFlow.js",
+    "VanillaFlow.min.js",
+    "VanillaFlow.min.js.map",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "terser VanillaFlow.js --compress --mangle --module --source-map \"url='VanillaFlow.min.js.map'\" -o VanillaFlow.min.js",
+    "dev": "npx --yes serve . -l 8000",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "vanilla",
+    "reactive",
+    "directives",
+    "dom",
+    "tiny",
+    "no-build",
+    "x-bind",
+    "x-for",
+    "x-model",
+    "framework"
+  ],
+  "author": "El Houssaine Izem <izem.hsn@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/izemhsn/VanillaFlow.git"
+  },
+  "bugs": {
+    "url": "https://github.com/izemhsn/VanillaFlow/issues"
+  },
+  "homepage": "https://github.com/izemhsn/VanillaFlow#readme",
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "terser": "^5.36.0"
+  }
+}
