@@ -1,8 +1,11 @@
 export default class VanillaFlow {
-    constructor(data = {}) {
+    constructor(data = {}, options = {}) {
+        const config = options || {};
+
         this.data = data;
         this.bindings = [];
         this._cache = new Map();
+        this.sanitizeHtml = config.sanitizeHtml || VanillaFlow.sanitizeHtml;
 
         for (const key of Object.keys(data)) {
             if (typeof data[key] === 'function') {
@@ -43,7 +46,7 @@ export default class VanillaFlow {
         }
         if (el.hasAttribute('x-html')) {
             const expr = el.getAttribute('x-html');
-            el.innerHTML = this.evaluate(expr, scope) ?? '';
+            el.innerHTML = this.sanitizeHtml(this.evaluate(expr, scope)) ?? '';
             this.bindings.push({ type: 'html', el, expr, scope });
             el.removeAttribute('x-html');
         }
@@ -146,10 +149,72 @@ export default class VanillaFlow {
         for (const b of this.bindings) {
             const v = this.evaluate(b.expr, b.scope);
             if (b.type === 'text') b.el.textContent = v ?? '';
-            else if (b.type === 'html') b.el.innerHTML = v ?? '';
+            else if (b.type === 'html') b.el.innerHTML = this.sanitizeHtml(v) ?? '';
             else if (b.type === 'show') b.el.style.display = v ? '' : 'none';
             else if (b.type === 'attr') this.applyAttr(b.el, b.attr, v);
         }
+    }
+
+    static sanitizeHtml(value) {
+        const html = value == null ? '' : String(value);
+        const purifier = typeof globalThis !== 'undefined' ? globalThis.DOMPurify : undefined;
+
+        if (purifier && typeof purifier.sanitize === 'function') {
+            return purifier.sanitize(html);
+        }
+
+        if (typeof document === 'undefined') return '';
+
+        const template = document.createElement('template');
+        template.innerHTML = html;
+
+        const blockedTags = new Set([
+            'BASE',
+            'EMBED',
+            'FORM',
+            'IFRAME',
+            'LINK',
+            'META',
+            'OBJECT',
+            'SCRIPT',
+            'STYLE',
+            'TEMPLATE'
+        ]);
+        const blockedAttrs = new Set(['srcdoc']);
+        const urlAttrs = new Set(['action', 'formaction', 'href', 'poster', 'src', 'xlink:href']);
+
+        for (const node of Array.from(template.content.querySelectorAll('*'))) {
+            if (blockedTags.has(node.tagName)) {
+                node.remove();
+                continue;
+            }
+
+            for (const attr of Array.from(node.attributes)) {
+                const name = attr.name.toLowerCase();
+                if (
+                    name.startsWith('on') ||
+                    blockedAttrs.has(name) ||
+                    (urlAttrs.has(name) && VanillaFlow.isUnsafeUrl(attr.value))
+                ) {
+                    node.removeAttribute(attr.name);
+                }
+            }
+        }
+
+        return template.innerHTML;
+    }
+
+    static isUnsafeUrl(value) {
+        const normalized = String(value)
+            .trim()
+            .replace(/[\u0000-\u001F\u007F\s]+/g, '')
+            .toLowerCase();
+
+        return (
+            normalized.startsWith('javascript:') ||
+            normalized.startsWith('vbscript:') ||
+            normalized.startsWith('data:')
+        );
     }
 
     evaluate(expression, scope) {
