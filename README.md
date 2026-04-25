@@ -67,11 +67,13 @@ Sets the **text content** of an element.
 
 ### `x-html`
 
-Sets the **inner HTML** of an element.
+Sets the **sanitized inner HTML** of an element.
 
 ```html
 <div x-html="htmlContent"></div>
 ```
+
+VanillaFlow uses `DOMPurify.sanitize()` when a global `DOMPurify` instance is available. Otherwise it applies a conservative built-in sanitizer that removes script-capable elements, inline event handlers, `srcdoc`, and unsafe URL schemes.
 
 ### `x-model`
 
@@ -175,9 +177,19 @@ All directive values are **JavaScript expressions** evaluated with the data obje
 
 ## API
 
-### `new VanillaFlow(data)`
+### `new VanillaFlow(data, options?)`
 
 Creates a new instance. `data` is a plain object whose properties and methods become available in directive expressions. Methods are automatically bound so `this` inside them refers to `data`.
+
+Pass `options.sanitizeHtml` to customize `x-html` sanitization:
+
+```js
+new VanillaFlow(data, {
+  sanitizeHtml(value) {
+    return DOMPurify.sanitize(value ?? '');
+  }
+}).init();
+```
 
 ### `.init(root?)`
 
@@ -206,7 +218,7 @@ setInterval(() => {
 - **`x-if` is one-shot.** When the expression is falsy at `init()`, the element is removed from the DOM and is not brought back.
 - **`x-model` needs a property path.** Binding to a plain loop variable (`x-model="item"` inside `x-for="item in items"`) can't write back into the array. Use a property path instead: `x-model="item.value"`.
 - **`x-model` input types.** Text inputs and `type="checkbox"` are supported. Radio groups, `<select multiple>`, and numeric coercion (`type="number"`, `"range"`, `"date"`) are not — bound values stay as strings.
-- **`x-html` is an XSS sink.** Never pass untrusted strings to it.
+- **`x-html` is sanitized.** Use DOMPurify for stronger coverage when rendering untrusted HTML, or pass a custom `sanitizeHtml` function.
 - **Reserved name.** `__vfval` is used internally by `x-model`; avoid it as a `data` key. `$event` is reserved inside `x-on:*` handlers only.
 - **Event modifiers supported:** `.prevent`, `.stop`. Others (`.once`, `.enter`, …) are not.
 - **CSP.** Expressions are compiled with `new Function`, so a Content Security Policy must allow `'unsafe-eval'`.
